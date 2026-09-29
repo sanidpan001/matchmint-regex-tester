@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MatchMint — Free Online Regex Tester, Debugger &amp; Find-Replace Tool</title>
+<meta name="description" content="MatchMint is a free online regex tester with live match highlighting, color-coded capture groups, find-and-replace preview, ReDoS risk detection, one-click code export and a 30-pattern library. No signup, unlimited use.">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  /* match highlight layers */
+  #hl { pointer-events: none; }
+  #hl .mm { border-radius: 3px; padding: 1px 0; }
+  #hl .mm-0 { background: rgba(121,192,255,.28); }
+  #hl .mm-1 { background: rgba(210,168,255,.30); }
+  #hl .mm-2 { background: rgba(255,166,87,.30); }
+  #hl .mm-3 { background: rgba(126,231,135,.24); }
+  #hl .mm-4 { background: rgba(255,123,114,.28); }
+  #hl .mm-5 { background: rgba(249,199,79,.28); }
+  #hl .mm-caret { display: inline-block; width: 2px; height: 1.1em; background: #79C0FF; vertical-align: text-bottom; margin: 0 1px; }
+  .flagbtn { transition: all .15s ease; }
+  .flagbtn.on { background: #79C0FF; color: #0D1117; border-color: #79C0FF; font-weight: 700; }
+  .tabbtn.on { background: #161E2A; color: #79C0FF; border-color: #79C0FF; }
+  .langbtn.on { background: #D2A8FF; color: #0D1117; border-color: #D2A8FF; font-weight: 700; }
+  .libbtn:hover { border-color: #79C0FF; transform: translateY(-1px); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0D1117; }
+  ::-webkit-scrollbar-thumb { background: #2A3648; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3B4B63; }
+  .toast { transition: opacity .3s ease, transform .3s ease; }
+  .prose-mm h2 { color: #79C0FF; font-size: 1.5rem; font-weight: 700; margin: 2rem 0 .75rem; }
+  .prose-mm h3 { color: #D2A8FF; font-size: 1.15rem; font-weight: 600; margin: 1.5rem 0 .5rem; }
+  .prose-mm p, .prose-mm li { color: #C3CEDD; line-height: 1.75; }
+  .prose-mm p { margin: .75rem 0; }
+  .prose-mm ul { list-style: disc; padding-left: 1.5rem; margin: .75rem 0; }
+  .prose-mm ol { list-style: decimal; padding-left: 1.5rem; margin: .75rem 0; }
+  .prose-mm code { background: #161E2A; color: #79C0FF; padding: .1rem .4rem; border-radius: .375rem; font-size: .85em; }
+  .prose-mm pre { background: #010409; border: 1px solid #1C2635; border-radius: .75rem; padding: 1rem; overflow-x: auto; margin: 1rem 0; }
+  .prose-mm pre code { background: none; padding: 0; }
+  .prose-mm table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+  .prose-mm th, .prose-mm td { border: 1px solid #1C2635; padding: .5rem .75rem; text-align: left; }
+  .prose-mm th { background: #161E2A; color: #79C0FF; }
+  .prose-mm td { color: #C3CEDD; }
+  @media print { .no-print { display: none !important; } }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is a regular expression and what is it used for?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A regular expression (regex) is a sequence of characters that defines a search pattern. It is used to find, validate, extract, and replace text: checking that an email address has the right shape, pulling phone numbers out of a document, renaming files in bulk, or parsing log lines. Almost every programming language ships a regex engine, so one pattern can often be reused across JavaScript, Python, PHP, and Java with only small flag adjustments."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does my regex match nothing, or match the wrong text?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The most common causes are unescaped special characters (a dot matches any character, so use \\. for a literal dot), greedy quantifiers consuming too much (.* grabs everything to the last possible position — try .*? for lazy matching), missing anchors (^ and $ pin a match to the start and end of the string), and wrong flags (case sensitivity needs the i flag; ^ and $ match line boundaries only with the m flag). Paste the pattern into a live tester, watch the highlighted matches, and add one token at a time until the behavior changes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the difference between * , + and ? in regex?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "* means zero or more repetitions, + means one or more, and ? means zero or one (optional). So \\d+ requires at least one digit while \\d* also matches an empty string. All three are greedy by default: they consume as much as possible and only give characters back if the rest of the pattern fails. Appending another ? (as in *?, +?, ??) makes them lazy, matching as little as possible."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do capture groups and named groups work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Parentheses create capture groups: each pair captures the text it matched, numbered from 1 by the position of its opening parenthesis. In a replacement string, $1 refers to group 1, $2 to group 2, and so on. Named groups use the (?<name>...) syntax and can be referenced as $<name>. Groups that start with (?:...) are non-capturing: they group tokens together without storing a result, which keeps numbering clean and is slightly faster."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is catastrophic backtracking (ReDoS) and how do I avoid it?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Catastrophic backtracking happens when a pattern nests quantifiers, like (a+)+ or (.*)*, so the engine must try exponentially many ways to divide the same input. On a crafted near-miss string a short pattern can hang for seconds or minutes — a denial-of-service risk (ReDoS) when the regex runs on user input. Avoid it by never quantifying a group whose body already contains an unbounded quantifier, by replacing .* with a precise negated class such as [^,] , and by testing patterns against long near-miss inputs before shipping them."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which regex flags should I use: g, i, m, s, u, y?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Use g (global) to find every match instead of stopping at the first. Use i for case-insensitive matching. Use m (multiline) so ^ and $ match at line boundaries inside multi-line text. Use s (dotAll) when . must also match newlines. Use u (unicode) for correct handling of emoji and astral characters and for \\p{...} Unicode property escapes. Use y (sticky) when matches must start exactly at the current position, which is handy for writing tokenizers. Combine them freely, for example gi."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body id="top" class="bg-[#0D1117] text-slate-200 min-h-screen antialiased">
+
+<header class="sticky top-0 z-40 border-b border-[#1C2635] bg-[#0D1117]/95 backdrop-blur">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between">
+    <a href="#top" class="mono text-lg font-bold tracking-tight" aria-label="MatchMint home">
+      <span class="text-[#79C0FF]">/</span><span class="text-slate-100">Match</span><span class="text-[#D2A8FF]">Mint</span><span class="text-[#79C0FF]">/g</span>
+    </a>
+    <nav class="flex items-center gap-5 text-sm font-medium">
+      <a href="#top" class="text-slate-300 hover:text-[#79C0FF] transition-colors">Home</a>
+      <a href="https://fixoraa.tech" class="text-slate-300 hover:text-[#79C0FF] transition-colors">More Tools</a>
+    </nav>
+  </div>
+</header>
+
+<div class="no-print mx-auto max-w-6xl px-4 sm:px-6 pt-4" role="complementary" aria-label="Advertisement">
+  <div class="mx-auto text-center" style="max-width:728px">
+    <span class="block text-[10px] tracking-[0.18em] uppercase text-slate-400 mb-1.5">Advertisement</span>
+    <div class="flex justify-center overflow-hidden">
+      <div class="origin-top scale-[0.44] sm:scale-100 shrink-0">
+        <script>
+          atOptions = { 'key' : '4e68ac77881c17fe128a46565d9a4e8c', 'format' : 'iframe', 'height' : 90, 'width' : 728, 'params' : {} };
+        </script>
+        <script src="https://www.highrevenueformat.com/4e68ac77881c17fe128a46565d9a4e8c/invoke.js"></script>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="mx-auto max-w-6xl px-4 sm:px-6 py-6">
+
+  <div class="text-center mb-6">
+    <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-50">
+      Regex <span class="text-[#79C0FF]">Tester</span> &amp; <span class="text-[#D2A8FF]">Debugger</span>
+    </h1>
+    <p class="mt-2 text-slate-400 max-w-2xl mx-auto">Type a pattern, watch every match light up live. Inspect capture groups, preview find-and-replace, catch ReDoS risks, and export ready-to-paste code.</p>
+    <div class="mt-3 inline-flex items-center gap-2 rounded-full border border-[#79C0FF]/40 bg-[#79C0FF]/10 px-4 py-1.5 text-sm font-semibold text-[#79C0FF]">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+      Unlimited Free Usage
+    </div>
+    <p class="mt-2 text-xs text-slate-500">No signup &middot; no paywall &middot; everything runs in your browser</p>
+  </div>
+
+  <!-- ============ PATTERN CARD ============ -->
+  <section class="rounded-xl border border-[#1C2635] bg-[#010409] shadow-[0_0_40px_rgba(121,192,255,0.06)]" aria-label="Regex pattern editor">
+    <div class="flex items-center justify-between px-4 pt-3">
+      <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Pattern</span>
+      <div class="flex items-center gap-2">
+        <button id="shareBtn" class="text-xs font-semibold rounded-md border border-[#1C2635] px-3 py-1.5 text-[#79C0FF] hover:border-[#79C0FF] transition-colors" title="Copy a shareable link with pattern, flags and test string">🔗 Share</button>
+        <button id="copyPatternBtn" class="text-xs font-semibold rounded-md border border-[#1C2635] px-3 py-1.5 text-slate-300 hover:border-[#D2A8FF] hover:text-[#D2A8FF] transition-colors" title="Copy the raw pattern">Copy</button>
+        <button id="clearBtn" class="text-xs font-semibold rounded-md border border-[#1C2635] px-3 py-1.5 text-slate-400 hover:border-red-400 hover:text-red-300 transition-colors" title="Reset pattern, flags and test string">Reset</button>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 px-4 pt-2">
+      <span class="mono text-2xl text-[#79C0FF] select-none">/</span>
+      <input id="pattern" type="text" spellcheck="false" autocomplete="off"
+        class="mono flex-1 min-w-0 bg-[#0D1117] border border-[#1C2635] rounded-lg px-3 py-2.5 text-base text-[#E6EDF3] placeholder-slate-600 focus:outline-none focus:border-[#79C0FF] focus:ring-1 focus:ring-[#79C0FF]/40"
+        placeholder="your-regex-here">
+      <span class="mono text-2xl text-[#79C0FF] select-none">/</span>
+    </div>
+    <div class="px-4 pt-3 flex flex-wrap items-center gap-2">
+      <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500 mr-1">Flags</span>
+      <div id="flags" class="flex flex-wrap gap-1.5"></div>
+      <span id="flagHint" class="text-xs text-slate-500 ml-1"></span>
+    </div>
+    <div id="regexError" class="mx-4 mt-3 hidden rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300 mono"></div>
+    <div id="redosBox" class="mx-4 mt-3 hidden rounded-lg border px-3 py-2 text-sm"></div>
+    <div class="px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
+      <span><span class="mono text-[#79C0FF]">g</span> global</span>
+      <span><span class="mono text-[#79C0FF]">i</span> ignore case</span>
+      <span><span class="mono text-[#79C0FF]">m</span> multiline</span>
+      <span><span class="mono text-[#79C0FF]">s</span> dotAll</span>
+      <span><span class="mono text-[#79C0FF]">u</span> unicode</span>
+      <span><span class="mono text-[#79C0FF]">y</span> sticky</span>
+    </div>
+  </section>
+
+  <!-- ============ MODE TABS ============ -->
+  <div class="mt-6 flex gap-2 no-print">
+    <button id="tabTest" class="tabbtn on rounded-lg border border-[#1C2635] px-5 py-2 text-sm font-semibold text-slate-300 transition-colors">🔍 Tester</button>
+    <button id="tabReplace" class="tabbtn rounded-lg border border-[#1C2635] px-5 py-2 text-sm font-semibold text-slate-300 transition-colors">🔁 Find &amp; Replace</button>
+  </div>
+
+  <!-- ============ TESTER ============ -->
+  <section id="paneTest" class="mt-4 grid gap-4 lg:grid-cols-5">
+    <div class="lg:col-span-3 rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Test string</span>
+        <span id="stats" class="mono text-xs text-slate-400"></span>
+      </div>
+      <div class="relative rounded-lg border border-[#1C2635] bg-[#0D1117] overflow-hidden">
+        <pre id="hl" aria-hidden="true" class="mono absolute inset-0 overflow-hidden p-3 text-sm leading-6 whitespace-pre-wrap break-words"></pre>
+        <textarea id="testText" spellcheck="false"
+          class="mono relative block w-full min-h-[240px] max-h-[420px] resize-y bg-transparent p-3 text-sm leading-6 whitespace-pre-wrap break-words text-transparent caret-[#79C0FF] selection:bg-[#79C0FF]/40 focus:outline-none"></textarea>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <span><span class="inline-block w-3 h-3 rounded-sm bg-[rgba(121,192,255,.45)] align-middle mr-1"></span>match</span>
+        <span><span class="inline-block w-3 h-3 rounded-sm align-middle mr-1" style="box-shadow: inset 0 -4px 0 #D2A8FF; background: rgba(121,192,255,.28)"></span>capture group</span>
+        <span class="ml-auto">click a group row below to copy its text</span>
+      </div>
+    </div>
+
+    <div class="lg:col-span-2 rounded-xl border border-[#1C2635] bg-[#010409] p-4 flex flex-col min-h-[300px]">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Match inspector</span>
+        <span id="matchCount" class="mono text-xs text-[#D2A8FF]"></span>
+      </div>
+      <div id="inspector" class="flex-1 overflow-y-auto max-h-[520px] space-y-3 pr-1"></div>
+    </div>
+  </section>
+
+  <!-- ============ REPLACE ============ -->
+  <section id="paneReplace" class="mt-4 hidden">
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Replacement string</span>
+        <span class="text-xs text-slate-500">supports <span class="mono text-[#79C0FF]">$1</span>, <span class="mono text-[#79C0FF]">$&lt;name&gt;</span>, <span class="mono text-[#79C0FF]">$&amp;</span>, <span class="mono text-[#79C0FF]">$$</span></span>
+      </div>
+      <input id="replacement" type="text" spellcheck="false" autocomplete="off"
+        class="mono w-full bg-[#0D1117] border border-[#1C2635] rounded-lg px-3 py-2.5 text-base text-[#E6EDF3] placeholder-slate-600 focus:outline-none focus:border-[#D2A8FF] focus:ring-1 focus:ring-[#D2A8FF]/40"
+        placeholder="$1">
+      <div id="replaceError" class="mt-3 hidden rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300 mono"></div>
+      <div class="mt-4">
+        <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Result preview</span>
+        <pre id="replaceOut" class="mono mt-2 rounded-lg border border-[#1C2635] bg-[#0D1117] p-3 text-sm leading-6 whitespace-pre-wrap break-words max-h-[240px] overflow-y-auto"></pre>
+      </div>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <span class="text-[11px] uppercase tracking-[0.2em] text-red-300/80">Before</span>
+          <pre id="diffBefore" class="mono mt-2 rounded-lg border border-red-500/25 bg-[#0D1117] p-3 text-sm leading-6 whitespace-pre-wrap break-words max-h-[240px] overflow-y-auto"></pre>
+        </div>
+        <div>
+          <span class="text-[11px] uppercase tracking-[0.2em] text-emerald-300/80">After</span>
+          <pre id="diffAfter" class="mono mt-2 rounded-lg border border-emerald-500/25 bg-[#0D1117] p-3 text-sm leading-6 whitespace-pre-wrap break-words max-h-[240px] overflow-y-auto"></pre>
+        </div>
+      </div>
+      <div class="mt-3 flex justify-end">
+        <button id="copyResultBtn" class="text-xs font-semibold rounded-md border border-[#1C2635] px-3 py-1.5 text-[#79C0FF] hover:border-[#79C0FF] transition-colors">Copy result</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CODE SNIPPETS ============ -->
+  <section class="mt-6 rounded-xl border border-[#1C2635] bg-[#010409] p-4" aria-label="Code export">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Export as code</span>
+      <div class="flex items-center gap-2">
+        <div class="flex gap-1.5" role="tablist" aria-label="Language">
+          <button data-lang="js" class="langbtn on mono text-xs rounded-md border border-[#1C2635] px-3 py-1.5 text-slate-300 transition-colors">JavaScript</button>
+          <button data-lang="python" class="langbtn mono text-xs rounded-md border border-[#1C2635] px-3 py-1.5 text-slate-300 transition-colors">Python</button>
+          <button data-lang="php" class="langbtn mono text-xs rounded-md border border-[#1C2635] px-3 py-1.5 text-slate-300 transition-colors">PHP</button>
+          <button data-lang="java" class="langbtn mono text-xs rounded-md border border-[#1C2635] px-3 py-1.5 text-slate-300 transition-colors">Java</button>
+        </div>
+        <button id="copyCodeBtn" class="text-xs font-semibold rounded-md border border-[#1C2635] px-3 py-1.5 text-[#D2A8FF] hover:border-[#D2A8FF] transition-colors">Copy code</button>
+      </div>
+    </div>
+    <pre class="rounded-lg border border-[#1C2635] bg-[#0D1117] overflow-x-auto"><code id="codeOut" class="mono block p-4 text-sm leading-6 text-[#E6EDF3]"></code></pre>
+    <p class="mt-2 text-xs text-slate-500">Snippets are generated from your current pattern and flags, with escaping handled per language.</p>
+  </section>
+
+  <!-- ============ PATTERN LIBRARY ============ -->
+  <section class="mt-6 rounded-xl border border-[#1C2635] bg-[#010409] p-4" aria-label="Pattern library">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <span class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Pattern library <span id="libCount" class="text-[#D2A8FF]"></span></span>
+      <input id="libSearch" type="text" placeholder="Search patterns…"
+        class="bg-[#0D1117] border border-[#1C2635] rounded-lg px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-[#79C0FF] w-48">
+    </div>
+    <div id="libGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"></div>
+    <p class="mt-2 text-xs text-slate-500">Click any pattern to load it into the tester. Patterns are starting points — always test against your own data.</p>
+  </section>
+
+</main>
+
+<div class="no-print mx-auto max-w-6xl px-4 sm:px-6 pb-4" role="complementary" aria-label="Advertisement">
+  <div class="mx-auto text-center" style="max-width:728px">
+    <span class="block text-[10px] tracking-[0.18em] uppercase text-slate-400 mb-1.5">Advertisement</span>
+    <div class="flex justify-center overflow-hidden">
+      <script async src="https://js.wpadmngr.com/static/adManager.js" data-admpid="464498"></script>
+    </div>
+  </div>
+</div>
+
+<article class="mx-auto max-w-6xl px-4 sm:px-6 pb-10 prose-mm">
+  <h2>The Complete Guide to Regular Expressions: Syntax, Patterns &amp; Debugging</h2>
+  <p>Regular expressions — regex for short — are one of the highest-leverage skills a developer, data analyst, or power user can learn. A single line of regex can validate thousands of form submissions, extract phone numbers from a messy spreadsheet export, or rename ten thousand files in seconds. Yet regex also has a reputation for being cryptic: dense strings of slashes, brackets, and backslashes that look like line noise until they click. This guide demystifies them from the ground up. You will learn the core syntax, a cookbook of patterns you can use immediately, and a practical debugging workflow for the moments when a pattern misbehaves. Everything here can be tested live in the MatchMint tester above — paste each example in and watch the matches highlight.</p>
+
+  <h3>What a regular expression actually is</h3>
+  <p>At its core, a regular expression is a miniature language for describing sets of strings. When you write <code>\d+</code>, you are not describing one specific string; you are describing every string that consists of one or more digits — <code>7</code>, <code>42</code>, <code>987654</code>, and infinitely many more. A regex engine takes your pattern and an input string and reports where the pattern matches. That simple idea powers an enormous range of real work: input validation on signup forms, syntax highlighting in code editors, search-and-replace in every serious text editor, log parsing, web scraping, and data cleaning pipelines.</p>
+  <p>Nearly every mainstream language ships a regex engine: JavaScript, Python, PHP, Java, Ruby, Go, Rust, and the .NET family all include one. The syntax is about 90% portable between them. The remaining 10% — flag names, lookbehind support, Unicode handling — is where cross-language tools and careful testing earn their keep, which is why exporting a tested pattern to several languages in one click saves real debugging time.</p>
+
+  <h3>Syntax guide: the building blocks</h3>
+  <p><strong>Literal characters</strong> match themselves. The pattern <code>cat</code> matches the substring "cat". The power comes from <strong>metacharacters</strong> — characters with special meaning: <code>. ^ $ * + ? { } [ ] \ | ( )</code>. To match one of these literally, escape it with a backslash: <code>\.</code> matches a real dot, <code>\$</code> matches a real dollar sign.</p>
+  <p><strong>Character classes</strong> match one character from a set. <code>[aeiou]</code> matches any single vowel; <code>[a-z]</code> matches any lowercase letter; <code>[^0-9]</code> matches any character that is not a digit. Shorthand classes cover the common cases: <code>\d</code> is any digit, <code>\w</code> is a word character (letters, digits, underscore), <code>\s</code> is whitespace, and <code>.</code> is any character except a newline (unless the dotAll flag is on). Their uppercase twins invert the meaning: <code>\D</code> is a non-digit, <code>\S</code> is non-whitespace.</p>
+  <p><strong>Quantifiers</strong> say how many times the preceding token may repeat. <code>*</code> means zero or more, <code>+</code> means one or more, <code>?</code> means zero or one, and <code>{n,m}</code> means between n and m times (<code>{3}</code> exactly three, <code>{2,}</code> two or more). By default quantifiers are <em>greedy</em>: they consume as much as possible, then reluctantly give characters back if the rest of the pattern cannot match. This is the single most misunderstood behavior in regex. Given the input <code>&lt;b&gt;one&lt;/b&gt; and &lt;b&gt;two&lt;/b&gt;</code>, the pattern <code>&lt;b&gt;.*&lt;/b&gt;</code> matches the entire string, not the two tags separately, because <code>.*</code> eats everything up to the <em>last</em> closing tag. Appending <code>?</code> makes a quantifier <em>lazy</em> — <code>&lt;b&gt;.*?&lt;/b&gt;</code> stops at the first closing tag. When in doubt, prefer a precise negated class like <code>[^&lt;]*</code> over <code>.*?</code>: it is faster and its intent is clearer.</p>
+  <p><strong>Anchors</strong> pin a match to a position rather than consuming characters. <code>^</code> anchors to the start of the string (or line, with the multiline flag), <code>$</code> to the end, and <code>\b</code> to a word boundary — the invisible edge between a word character and a non-word character. This is why validation patterns almost always look like <code>^...$</code>: without anchors, <code>\d{5}</code> happily matches the first five digits of a ten-digit string.</p>
+  <p><strong>Groups and alternation</strong> organize patterns. Parentheses group tokens so a quantifier applies to all of them: <code>(ab)+</code> matches "ababab". The pipe <code>|</code> means "or": <code>cat|dog</code> matches either word. Each pair of parentheses also <em>captures</em> what it matched, numbered from 1 by the position of the opening parenthesis. Named groups — <code>(?&lt;year&gt;\d{4})</code> — give the capture a readable name you can reference as <code>$&lt;year&gt;</code> in replacements. Groups starting with <code>(?:</code> are non-capturing: they group without storing, keeping your numbering clean. <strong>Backreferences</strong> like <code>\1</code> let a pattern refer to an earlier group, which is how <code>\b(\w+)\s+\1\b</code> finds doubled words such as "the the". <strong>Lookarounds</strong> assert what surrounds a position without consuming it: <code>(?=\d)</code> requires a digit next, <code>(?!admin)</code> forbids a prefix, and lookbehinds <code>(?&lt;=)</code> / <code>(?&lt;!)</code> do the same looking backwards. They are the secret behind "match X only when followed by Y" logic.</p>
+
+  <h3>Common patterns cookbook</h3>
+  <p>These battle-tested starting points cover the patterns people search for most. Load any of them from the library above and adapt to your data — no pattern is universal, and real-world input always has surprises.</p>
+  <table>
+    <thead><tr><th>Task</th><th>Pattern idea</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Email</td><td><code>^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$</code></td><td>Pragmatic, not RFC-perfect; pair with a confirmation email for real validation.</td></tr>
+      <tr><td>URL</td><td><code>https?://[^\s/$.?#].[^\s]*</code></td><td>Good for extraction; strict validation needs a proper parser.</td></tr>
+      <tr><td>Date (ISO)</td><td><code>\b\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b</code></td><td>Validates month/day ranges; Feb 30 still slips through.</td></tr>
+      <tr><td>IPv4</td><td><code>\b(?:\d{1,3}\.){3}\d{1,3}\b</code></td><td>Allows 999.999.999.999 — add range checks for strictness.</td></tr>
+      <tr><td>Hex color</td><td><code>#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b</code></td><td>Covers #RGB and #RRGGBB.</td></tr>
+      <tr><td>Strong password</td><td><code>^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&amp;])[A-Za-z\d@$!%*?&amp;]{8,}$</code></td><td>Lookaheads enforce each character class.</td></tr>
+      <tr><td>Duplicate words</td><td><code>\b(\w+)\s+\1\b</code></td><td>Backreference finds "the the".</td></tr>
+    </tbody>
+  </table>
+  <p>A recurring lesson: regex validates <em>shape</em>, not <em>meaning</em>. A pattern can confirm that something looks like a date or an email, but only domain logic — a calendar check, a confirmation message — proves it is real. Use regex as the first filter, never the only one.</p>
+
+  <h3>Debugging tips that actually work</h3>
+  <p><strong>1. Build incrementally.</strong> Never write a 60-character pattern in one go. Start with the simplest core that matches, verify it highlights correctly, then add one token at a time. When the matches break, the last token you added is the culprit.</p>
+  <p><strong>2. Test the failures, not just the successes.</strong> A pattern that matches everything you want is only half tested. Feed it strings that <em>should not</em> match — empty input, near-misses, maliciously long strings — and confirm it rejects them. Most regex bugs hide in the inputs you never tried.</p>
+  <p><strong>3. Suspect greediness first.</strong> If a match is far longer than expected, a greedy <code>.*</code> or <code>.+</code> is almost always the cause. Make it lazy with <code>?</code> or, better, replace it with a negated class that cannot overshoot.</p>
+  <p><strong>4. Watch your anchors and flags.</strong> A validation pattern without <code>^...$</code> is a substring search wearing a disguise. Case problems need the <code>i</code> flag; <code>^</code> and <code>$</code> only respect line boundaries with <code>m</code>; a dot that must cross newlines needs <code>s</code>.</p>
+  <p><strong>5. Escape deliberately.</strong> Inside character classes most metacharacters lose their special meaning, but <code>]</code>, <code>\</code>, <code>^</code> (first), and <code>-</code> (between characters) still need care. When a literal dot matches "any character" and your pattern still passes tests, you have a bug waiting for adversarial input.</p>
+  <p><strong>6. Respect catastrophic backtracking.</strong> Patterns like <code>(a+)+</code>, <code>(.*)*</code>, or <code>(a|a)*</code> nest quantifiers so the engine explores exponentially many ways to split the same input. On a long near-miss string they can freeze a page or a server — a real denial-of-service vector (ReDoS) when user input reaches the regex. The fix is structural: collapse nested repetition into one quantifier, swap <code>.*</code> for a specific class like <code>[^,]*</code>, or make alternatives mutually exclusive. A tester that flags these shapes before you ship is worth more than any amount of post-hoc profiling.</p>
+  <p><strong>7. Read the groups, not just the match.</strong> When extraction is wrong, the full match often looks fine while a group captured the wrong slice. Inspect every numbered and named group per match — color-coded group inspection turns a twenty-minute squint into a ten-second glance.</p>
+  <p><strong>8. Mind the flavor.</strong> JavaScript, Python, PHP, and Java agree on the basics but differ on details: lookbehind, Unicode property escapes (<code>\p{L}</code>), and flag letters vary. If a pattern works in the browser but fails on the server, the flavor gap is the first place to look — export the pattern to your target language and re-test there.</p>
+
+  <h3>Performance habits for production regex</h3>
+  <p>Prefer specific over general: <code>\d{4}-\d{2}-\d{2}</code> beats <code>.*-.*-.*</code> in both speed and clarity. Use non-capturing groups <code>(?:...)</code> when you do not need the capture — fewer groups mean less bookkeeping. Avoid leading <code>.*</code> when a anchored prefix or a negated class will do. And never run a nested-quantifier pattern against unbounded user input; if you cannot rewrite it, at least enforce a maximum input length and a match timeout on the server side.</p>
+  <p>Master these fundamentals and regex stops being line noise and becomes what it truly is: the fastest text-processing tool most developers already have installed. Keep the tester open in a tab, build patterns incrementally, inspect the groups, check the ReDoS badge, and export clean code to your stack — that loop is the whole craft.</p>
+
+  <h2>Frequently Asked Questions</h2>
+  <div class="space-y-4 mt-4">
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <h3 class="!mt-0">What is a regular expression and what is it used for?</h3>
+      <p>A regular expression (regex) is a sequence of characters that defines a search pattern. It is used to find, validate, extract, and replace text: checking that an email address has the right shape, pulling phone numbers out of a document, renaming files in bulk, or parsing log lines. Almost every programming language ships a regex engine, so one pattern can often be reused across JavaScript, Python, PHP, and Java with only small flag adjustments.</p>
+    </div>
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <h3 class="!mt-0">Why does my regex match nothing, or match the wrong text?</h3>
+      <p>The most common causes are unescaped special characters (a dot matches any character, so use \. for a literal dot), greedy quantifiers consuming too much (.* grabs everything to the last possible position — try .*? for lazy matching), missing anchors (^ and $ pin a match to the start and end of the string), and wrong flags (case sensitivity needs the i flag; ^ and $ match line boundaries only with the m flag). Paste the pattern into a live tester, watch the highlighted matches, and add one token at a time until the behavior changes.</p>
+    </div>
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <h3 class="!mt-0">What is the difference between * , + and ? in regex?</h3>
+      <p>* means zero or more repetitions, + means one or more, and ? means zero or one (optional). So \d+ requires at least one digit while \d* also matches an empty string. All three are greedy by default: they consume as much as possible and only give characters back if the rest of the pattern fails. Appending another ? (as in *?, +?, ??) makes them lazy, matching as little as possible.</p>
+    </div>
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <h3 class="!mt-0">How do capture groups and named groups work?</h3>
+      <p>Parentheses create capture groups: each pair captures the text it matched, numbered from 1 by the position of its opening parenthesis. In a replacement string, $1 refers to group 1, $2 to group 2, and so on. Named groups use the (?&lt;name&gt;...) syntax and can be referenced as $&lt;name&gt;. Groups that start with (?:...) are non-capturing: they group tokens together without storing a result, which keeps numbering clean and is slightly faster.</p>
+    </div>
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <h3 class="!mt-0">What is catastrophic backtracking (ReDoS) and how do I avoid it?</h3>
+      <p>Catastrophic backtracking happens when a pattern nests quantifiers, like (a+)+ or (.*)*, so the engine must try exponentially many ways to divide the same input. On a crafted near-miss string a short pattern can hang for seconds or minutes — a denial-of-service risk (ReDoS) when the regex runs on user input. Avoid it by never quantifying a group whose body already contains an unbounded quantifier, by replacing .* with a precise negated class such as [^,] , and by testing patterns against long near-miss inputs before shipping them.</p>
+    </div>
+    <div class="rounded-xl border border-[#1C2635] bg-[#010409] p-4">
+      <h3 class="!mt-0">Which regex flags should I use: g, i, m, s, u, y?</h3>
+      <p>Use g (global) to find every match instead of stopping at the first. Use i for case-insensitive matching. Use m (multiline) so ^ and $ match at line boundaries inside multi-line text. Use s (dotAll) when . must also match newlines. Use u (unicode) for correct handling of emoji and astral characters and for \p{...} Unicode property escapes. Use y (sticky) when matches must start exactly at the current position, which is handy for writing tokenizers. Combine them freely, for example gi.</p>
+    </div>
+  </div>
+</article>
+
+<footer class="border-t border-[#1C2635] mt-4">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <span class="mono text-sm"><span class="text-[#79C0FF]">/</span><span class="text-slate-200">Match</span><span class="text-[#D2A8FF]">Mint</span><span class="text-[#79C0FF]">/g</span></span>
+    <nav class="flex items-center gap-5 text-sm">
+      <a href="#top" class="text-slate-400 hover:text-[#79C0FF]">Home</a>
+      <a href="https://fixoraa.tech" class="text-slate-400 hover:text-[#79C0FF]">More Tools</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+/* __PURE_START__ */
+'use strict';
+
+var GROUP_COLORS = ['#79C0FF', '#D2A8FF', '#FFA657', '#7EE787', '#FF7B72', '#F9C74F', '#4ADE80', '#F472B6'];
+
+function sanitizeFlags(flags) {
+  var seen = {}, out = '';
+  String(flags == null ? '' : flags).split('').forEach(function (c) {
+    if ('gimsuy'.indexOf(c) >= 0 && !seen[c]) { seen[c] = 1; out += c; }
+  });
+  return out;
+}
+
+function compileRegex(pattern, flags) {
+  var f = sanitizeFlags(flags);
+  try { return { ok: true, flags: f, regex: new RegExp(pattern, f) }; }
+  catch (e) { return { ok: false, flags: f, error: String((e && e.message) || e) }; }
+}
+
+function advancePastEmpty(str, pos) {
+  if (pos >= str.length) return pos + 1;
+  var cp = str.codePointAt(pos);
+  return pos + (cp > 0xFFFF ? 2 : 1);
+}
+
+function matchRecord(m) {
+  var groups = [], named = [], i;
+  var idx = m.indices, gidx = idx && idx.groups ? idx.groups : null;
+  for (i = 1; i < m.length; i++) {
+    var start = -1, end = -1;
+    if (idx && idx[i]) { start = idx[i][0]; end = idx[i][1]; }
+    else if (m[i] !== undefined && m[i] !== null) {
+      var rel = String(m[0]).indexOf(m[i]);
+      if (rel >= 0) { start = m.index + rel; end = start + m[i].length; }
+    }
+    groups.push({ n: i, text: m[i] === undefined ? null : m[i], start: start, end: end });
+  }
+  if (m.groups) {
+    Object.keys(m.groups).forEach(function (nm) {
+      var s = -1, e = -1;
+      if (gidx && gidx[nm]) { s = gidx[nm][0]; e = gidx[nm][1]; }
+      named.push({ name: nm, text: m.groups[nm] === undefined ? null : m.groups[nm], start: s, end: e });
+    });
+  }
+  return { index: m.index, full: m[0], end: m.index + m[0].length, groups: groups, named: named };
+}
+
+function extractMatches(pattern, flags, text) {
+  var f = sanitizeFlags(flags);
+  var str = String(text == null ? '' : text);
+  var rx;
+  try { rx = new RegExp(pattern, f + 'd'); }
+  catch (e1) {
+    try { rx = new RegExp(pattern, f); }
+    catch (e2) { return { ok: false, flags: f, error: String((e2 && e2.message) || e2), matches: [] }; }
+  }
+  var matches = [];
+  var global = f.indexOf('g') >= 0 || f.indexOf('y') >= 0;
+  var guard = 0, MAX = 20000, m;
+  if (global) {
+    rx.lastIndex = 0;
+    while ((m = rx.exec(str)) !== null) {
+      matches.push(matchRecord(m));
+      if (m[0] === '') rx.lastIndex = advancePastEmpty(str, rx.lastIndex);
+      if (++guard >= MAX || rx.lastIndex > str.length) break;
+    }
+  } else {
+    m = rx.exec(str);
+    if (m) matches.push(matchRecord(m));
+  }
+  return { ok: true, flags: f, matches: matches, truncated: guard >= MAX };
+}
+
+function buildGroupTable(matches) {
+  return (matches || []).map(function (m, mi) {
+    return {
+      no: mi + 1,
+      index: m.index,
+      full: m.full,
+      end: m.end,
+      rows: m.groups.map(function (g) {
+        return { key: 'g' + g.n, label: '$' + g.n, color: GROUP_COLORS[(g.n - 1) % GROUP_COLORS.length], text: g.text, start: g.start, end: g.end };
+      }),
+      named: m.named.map(function (g, ni) {
+        return { key: 'n' + g.name, label: '$<' + g.name + '>', color: GROUP_COLORS[(m.groups.length + ni) % GROUP_COLORS.length], text: g.text, start: g.start, end: g.end };
+      })
+    };
+  });
+}
+
+function diffRegions(before, after) {
+  before = String(before == null ? '' : before);
+  after = String(after == null ? '' : after);
+  var max = Math.min(before.length, after.length), s = 0, e = 0;
+  while (s < max && before.charAt(s) === after.charAt(s)) s++;
+  while (e < max - s && before.charAt(before.length - 1 - e) === after.charAt(after.length - 1 - e)) e++;
+  return {
+    pre: before.slice(0, s),
+    beforeMid: before.slice(s, before.length - e),
+    afterMid: after.slice(s, after.length - e),
+    post: before.slice(before.length - e)
+  };
+}
+
+function tokenizePattern(src) {
+  var toks = [], i = 0, c, j, m;
+  src = String(src == null ? '' : src);
+  while (i < src.length) {
+    c = src[i];
+    if (c === '\\') { toks.push({ t: 'atom', v: src.slice(i, i + 2) }); i += 2; continue; }
+    if (c === '[') {
+      j = i + 1;
+      if (src[j] === '^') j++;
+      if (src[j] === ']') j++;
+      while (j < src.length && src[j] !== ']') { if (src[j] === '\\') j++; j++; }
+      j = Math.min(j + 1, src.length);
+      toks.push({ t: 'atom', v: src.slice(i, j) }); i = j; continue;
+    }
+    if (c === '(') {
+      if (src[i + 1] === '?' && src[i + 2] === ':') { toks.push({ t: 'gopen', v: '(?:' }); i += 3; continue; }
+      if (src[i + 1] === '?' && (src[i + 2] === '=' || src[i + 2] === '!')) { toks.push({ t: 'gopen', v: src.slice(i, i + 3) }); i += 3; continue; }
+      if (src[i + 1] === '?' && src[i + 2] === '<' && (src[i + 3] === '=' || src[i + 3] === '!')) { toks.push({ t: 'gopen', v: src.slice(i, i + 4) }); i += 4; continue; }
+      m = /^\(\?<([A-Za-z_$][A-Za-z0-9_$]*)>/.exec(src.slice(i));
+      if (m) { toks.push({ t: 'gopen', v: m[0], name: m[1] }); i += m[0].length; continue; }
+      toks.push({ t: 'gopen', v: '(' }); i++; continue;
+    }
+    if (c === ')') { toks.push({ t: 'gclose', v: ')' }); i++; continue; }
+    if (c === '|') { toks.push({ t: 'alt', v: '|' }); i++; continue; }
+    if (c === '*' || c === '+' || c === '?') {
+      var v = c;
+      if (src[i + 1] === '?') { v += '?'; i++; }
+      toks.push({ t: 'quant', v: v, unbounded: true }); i++; continue;
+    }
+    if (c === '{') {
+      m = /^\{(\d+)(,(\d*)?)?\}\??/.exec(src.slice(i));
+      if (m) {
+        var unb = !!(m[2] && (m[3] === '' || m[3] === undefined));
+        toks.push({ t: 'quant', v: m[0], unbounded: unb }); i += m[0].length; continue;
+      }
+      toks.push({ t: 'atom', v: c }); i++; continue;
+    }
+    toks.push({ t: 'atom', v: c }); i++;
+  }
+  return toks;
+}
+
+function redosScan(pattern) {
+  var issues = [];
+  var toks = tokenizePattern(pattern);
+  var n = toks.length, i, o, c;
+  var matchClose = [];
+  for (i = 0; i < n; i++) matchClose.push(-1);
+  var st = [];
+  for (i = 0; i < n; i++) {
+    if (toks[i].t === 'gopen') st.push(i);
+    else if (toks[i].t === 'gclose') { o = st.pop(); if (o !== undefined) matchClose[o] = i; }
+  }
+  function groupSource(a, b) { var s = ''; for (var k = a; k <= b; k++) s += toks[k].v; return s; }
+  for (o = 0; o < n; o++) {
+    if (toks[o].t !== 'gopen' || matchClose[o] < 0) continue;
+    c = matchClose[o];
+    var body = toks.slice(o + 1, c);
+    var bodyHasUnb = body.some(function (t) { return t.t === 'quant' && t.unbounded; });
+    var next = toks[c + 1];
+    var selfUnb = !!(next && next.t === 'quant' && next.unbounded);
+    var src = groupSource(o, c) + (next && next.t === 'quant' ? next.v : '');
+    var branches = [], cur = '', depth = 0, k, t;
+    for (k = 0; k < body.length; k++) {
+      t = body[k];
+      if (t.t === 'gopen') { depth++; cur += t.v; }
+      else if (t.t === 'gclose') { depth--; cur += t.v; }
+      else if (t.t === 'alt' && depth === 0) { branches.push(cur); cur = ''; }
+      else cur += t.v;
+    }
+    branches.push(cur);
+    if (bodyHasUnb && selfUnb) {
+      issues.push({
+        severity: 'high', type: 'nested-quantifier', snippet: src,
+        message: 'Nested unbounded quantifiers in ' + src + ': the group repeats something that already repeats, so the engine can try exponentially many paths on near-miss input (classic ReDoS). Rewrite with a single repetition or a more specific character class.'
+      });
+    } else if (branches.length > 1 && selfUnb) {
+      var seenB = {}, dup = null, pre = null, a2, b2;
+      for (k = 0; k < branches.length && !dup; k++) {
+        var bt = branches[k].replace(/\s+/g, '');
+        if (bt !== '' && seenB[bt]) dup = branches[k];
+        seenB[bt] = 1;
+      }
+      if (!dup) {
+        outer: for (a2 = 0; a2 < branches.length; a2++) {
+          for (b2 = 0; b2 < branches.length; b2++) {
+            if (a2 === b2) continue;
+            var A = branches[a2], B = branches[b2];
+            if (A !== '' && B !== '' && (B.indexOf(A) === 0 || A.indexOf(B) === 0)) { pre = [A, B]; break outer; }
+          }
+        }
+      }
+      if (dup || pre) {
+        issues.push({
+          severity: 'medium', type: 'overlapping-alternation', snippet: src,
+          message: 'Overlapping alternatives inside repeated group ' + src + (dup ? ' (branch "' + dup + '" appears more than once)' : ' (branches "' + pre[0] + '" and "' + pre[1] + '" can match the same text)') + '. Each character can be consumed in many ways, risking heavy backtracking. Remove duplicates or make branches mutually exclusive.'
+        });
+      }
+    }
+    if (issues.length >= 8) break;
+  }
+  return issues;
+}
+
+function snippetJS(pattern, flags) {
+  var f = sanitizeFlags(flags);
+  var body = String(pattern).replace(/\//g, '\\/').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  return 'const regex = /' + body + '/' + f + ';\nconst matches = [...text.matchAll(regex)];\nfor (const m of matches) {\n  console.log(m[0], m.index);\n}';
+}
+
+function snippetPython(pattern, flags) {
+  var f = sanitizeFlags(flags);
+  var flagMap = { i: 're.IGNORECASE', m: 're.MULTILINE', s: 're.DOTALL' };
+  var py = [];
+  f.split('').forEach(function (c) { if (flagMap[c]) py.push(flagMap[c]); });
+  var lit;
+  if (pattern.indexOf("'''") < 0 && pattern.charAt(pattern.length - 1) !== '\\') lit = "r'''" + pattern + "'''";
+  else lit = "'" + pattern.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r') + "'";
+  var args = [lit].concat(py).join(', ');
+  var out = 'import re\n\npattern = re.compile(' + args + ')\nfor m in pattern.finditer(text):\n    print(m.group(0), m.start())';
+  var notes = [];
+  if (f.indexOf('y') >= 0) notes.push('# note: sticky (y) has no Python equivalent');
+  if (f.indexOf('u') >= 0) notes.push('# note: u (unicode) is the default in Python 3');
+  if (f.indexOf('g') >= 0) notes.push('# note: finditer() already finds all matches (g is implicit)');
+  if (notes.length) out += '\n' + notes.join('\n');
+  return out;
+}
+
+function snippetPHP(pattern, flags) {
+  var f = sanitizeFlags(flags).replace(/y/g, '');
+  var body = String(pattern).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\//g, '\\/');
+  var out = "$pattern = '/" + body + '/' + f + "';\npreg_match_all($pattern, $text, $matches);\nprint_r($matches[0]);";
+  if (sanitizeFlags(flags).indexOf('y') >= 0) out += '\n// note: sticky (y) has no PHP equivalent';
+  return out;
+}
+
+function snippetJava(pattern, flags) {
+  var f = sanitizeFlags(flags);
+  var flagMap = { i: 'Pattern.CASE_INSENSITIVE', m: 'Pattern.MULTILINE', s: 'Pattern.DOTALL', u: 'Pattern.UNICODE_CHARACTER_CLASS' };
+  var jf = [];
+  f.split('').forEach(function (c) { if (flagMap[c]) jf.push(flagMap[c]); });
+  var body = String(pattern).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  var flagArg = jf.length ? ', ' + jf.join(' | ') : '';
+  var out = 'Pattern pattern = Pattern.compile("' + body + '"' + flagArg + ');\nMatcher matcher = pattern.matcher(text);\nwhile (matcher.find()) {\n    System.out.println(matcher.group());\n}';
+  if (f.indexOf('y') >= 0) out += '\n// note: sticky (y) has no direct Java equivalent';
+  return out;
+}
+
+function encodeState(pattern, flags, text, replacement) {
+  var json = JSON.stringify({ p: String(pattern == null ? '' : pattern), f: sanitizeFlags(flags), t: String(text == null ? '' : text), r: String(replacement == null ? '' : replacement) });
+  var bytes = new TextEncoder().encode(json), bin = '', i;
+  for (i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeState(hash) {
+  try {
+    var s = String(hash || '').replace(/^#/, '').replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), bytes = new Uint8Array(bin.length), i;
+    for (i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var o = JSON.parse(new TextDecoder().decode(bytes));
+    return { pattern: String(o.p || ''), flags: sanitizeFlags(o.f), text: String(o.t || ''), replacement: String(o.r || '') };
+  } catch (e) { return null; }
+}
+
+var PATTERN_LIBRARY = [
+  { name: 'Email address', flags: 'gi', pattern: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}', desc: 'Pragmatic email matcher' },
+  { name: 'URL', flags: 'gi', pattern: 'https?://[^\\s/$.?#].[^\\s]*', desc: 'Extract http/https URLs' },
+  { name: 'IPv4 address', flags: 'g', pattern: '\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b', desc: 'Dotted-quad addresses' },
+  { name: 'IPv6 address', flags: 'g', pattern: '\\b(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\\b', desc: 'Colon-hex addresses' },
+  { name: 'Date (YYYY-MM-DD)', flags: 'g', pattern: '\\b\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])\\b', desc: 'ISO dates with valid ranges' },
+  { name: 'Time (24h)', flags: 'g', pattern: '\\b([01]\\d|2[0-3]):[0-5]\\d\\b', desc: 'HH:MM clock times' },
+  { name: 'Hex color', flags: 'gi', pattern: '#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\\b', desc: '#RGB and #RRGGBB' },
+  { name: 'US phone', flags: 'g', pattern: '\\b\\d{3}[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b', desc: '10-digit phone numbers' },
+  { name: 'Intl phone', flags: 'g', pattern: '\\+\\d{1,3}[-.\\s]?\\(?\\d{1,4}\\)?[-.\\s]?\\d{3,4}[-.\\s]?\\d{3,4}', desc: '+country-code numbers' },
+  { name: 'Credit card', flags: 'g', pattern: '\\b(?:\\d[ -]*?){13,16}\\b', desc: '13–16 digit card numbers' },
+  { name: 'SSN', flags: 'g', pattern: '\\b\\d{3}-\\d{2}-\\d{4}\\b', desc: 'US Social Security numbers' },
+  { name: 'ZIP code', flags: 'g', pattern: '\\b\\d{5}(?:-\\d{4})?\\b', desc: 'US ZIP / ZIP+4' },
+  { name: 'UUID', flags: 'gi', pattern: '\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b', desc: 'Universally unique IDs' },
+  { name: 'Slug', flags: 'g', pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', desc: 'URL-friendly slugs' },
+  { name: 'HTML tag', flags: 'g', pattern: '</?[a-zA-Z][^>]*>', desc: 'Opening/closing tags' },
+  { name: 'Hashtag', flags: 'g', pattern: '#[A-Za-z0-9_]+', desc: 'Social hashtags' },
+  { name: 'Mention', flags: 'g', pattern: '@[A-Za-z0-9_]{1,30}', desc: '@usernames' },
+  { name: 'Strong password', flags: '', pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$', desc: '8+ chars, mixed classes' },
+  { name: 'MAC address', flags: 'g', pattern: '\\b(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})\\b', desc: 'Hardware addresses' },
+  { name: 'Semver', flags: 'g', pattern: '\\bv?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?\\b', desc: 'Semantic versions' },
+  { name: 'Base64', flags: 'gm', pattern: '^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$', desc: 'Base64-encoded lines' },
+  { name: 'JWT', flags: 'g', pattern: '\\b[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\b', desc: 'JSON Web Tokens' },
+  { name: 'Number with commas', flags: 'g', pattern: '\\b\\d{1,3}(?:,\\d{3})+\\b', desc: '1,234,567 style' },
+  { name: 'Duplicate words', flags: 'gi', pattern: '\\b(\\w+)\\s+\\1\\b', desc: 'Find "the the"' },
+  { name: 'Whitespace runs', flags: 'g', pattern: '[ \\t]{2,}', desc: 'Double+ spaces/tabs' },
+  { name: 'File extension', flags: 'gi', pattern: '\\.([a-zA-Z0-9]{2,5})$', desc: 'Capture the extension' },
+  { name: 'UK postcode', flags: 'gi', pattern: '\\b[A-Z]{1,2}\\d[A-Z\\d]?\\s*\\d[A-Z]{2}\\b', desc: 'British postcodes' },
+  { name: 'India PAN', flags: 'g', pattern: '\\b[A-Z]{5}[0-9]{4}[A-Z]\\b', desc: 'Indian tax IDs' },
+  { name: 'Emoji', flags: 'gu', pattern: '[\\u{1F300}-\\u{1FAFF}]', desc: 'Emoji code points' },
+  { name: 'Currency amount', flags: 'g', pattern: '[$€£¥]\\s?\\d+(?:\\.\\d{2})?', desc: '$12.50 style amounts' }
+];
+/* __PURE_END__ */
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var FLAG_INFO = [
+    ['g', 'global — find all matches'], ['i', 'ignore case'], ['m', 'multiline — ^ $ per line'],
+    ['s', 'dotAll — . matches newlines'], ['u', 'unicode'], ['y', 'sticky — match at lastIndex']
+  ];
+  var DEFAULT_PATTERN = '(?<user>[A-Za-z0-9._%+-]+)@(?<domain>[A-Za-z0-9.-]+\\.[A-Za-z]{2,})';
+  var DEFAULT_TEXT = 'Contact support@example.com or sales@mail-server.co.uk for help.\nMeeting on 2026-10-01 at 14:30, backup date 2026-10-02.\nCall +1-555-123-4567 or visit https://example.com/docs.\nServer 192.168.1.1 responded in 12ms. Theme color: #79C0FF.';
+  var LS_KEY = 'matchmint-state-v1';
+  var state = { pattern: DEFAULT_PATTERN, flags: 'g', text: DEFAULT_TEXT, replacement: '$<user> at $<domain>', mode: 'test', lang: 'js' };
+
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.className = 'toast fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-[#79C0FF]/50 bg-[#010409] px-4 py-2 text-sm text-[#79C0FF] shadow-xl opacity-0 translate-y-2';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.classList.remove('opacity-0', 'translate-y-2'); });
+    setTimeout(function () { t.classList.add('opacity-0', 'translate-y-2'); setTimeout(function () { t.remove(); }, 350); }, 1800);
+  }
+  function copyText(s, msg) {
+    function done() { toast(msg || 'Copied to clipboard'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(s).then(done, function () { fallback(); });
+    } else fallback();
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed'); }
+      ta.remove();
+    }
+  }
+
+  /* ---------- flags ---------- */
+  function renderFlags() {
+    var box = $('flags'); box.innerHTML = '';
+    FLAG_INFO.forEach(function (fi) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = fi[0];
+      b.title = fi[1];
+      b.className = 'flagbtn mono text-sm w-8 h-8 rounded-md border border-[#1C2635] text-slate-300' + (state.flags.indexOf(fi[0]) >= 0 ? ' on' : '');
+      b.addEventListener('click', function () {
+        var f = state.flags;
+        f = f.indexOf(fi[0]) >= 0 ? f.split(fi[0]).join('') : f + fi[0];
+        state.flags = sanitizeFlags(f);
+        renderFlags(); run();
+      });
+      box.appendChild(b);
+    });
+    $('flagHint').textContent = state.flags ? '/' + state.flags : '(no flags)';
+  }
+
+  /* ---------- highlight underlay ---------- */
+  function renderUnderlay(text, matches) {
+    var bounds = { 0: 1 };
+    bounds[text.length] = 1;
+    var ivs = [];
+    matches.forEach(function (m, mi) {
+      bounds[m.index] = 1; bounds[m.end] = 1;
+      ivs.push({ s: m.index, e: m.end, cls: 'mm mm-' + (mi % 6), color: null });
+      m.groups.forEach(function (g) {
+        if (g.start >= 0 && g.end > g.start) {
+          bounds[g.start] = 1; bounds[g.end] = 1;
+          ivs.push({ s: g.start, e: g.end, cls: 'mm mm-' + (mi % 6), color: GROUP_COLORS[(g.n - 1) % GROUP_COLORS.length] });
+        }
+      });
+      m.named.forEach(function (g, ni) {
+        if (g.start >= 0 && g.end > g.start) {
+          bounds[g.start] = 1; bounds[g.end] = 1;
+          ivs.push({ s: g.start, e: g.end, cls: 'mm mm-' + (mi % 6), color: GROUP_COLORS[(m.groups.length + ni) % GROUP_COLORS.length] });
+        }
+      });
+    });
+    var zeroAt = {};
+    matches.forEach(function (m) { if (m.full === '') zeroAt[m.index] = (zeroAt[m.index] || 0) + 1; });
+    var pts = Object.keys(bounds).map(Number).sort(function (a, b) { return a - b; });
+    var html = '';
+    for (var i = 0; i < pts.length - 1; i++) {
+      var s = pts[i], e = pts[i + 1];
+      if (zeroAt[s]) for (var z = 0; z < zeroAt[s]; z++) html += '<span class="mm-caret" title="empty match"></span>';
+      if (e === s) continue;
+      var covering = ivs.filter(function (v) { return v.s <= s && v.e >= e; });
+      var chunk = escHtml(text.slice(s, e));
+      if (!covering.length) { html += chunk; continue; }
+      var colors = [];
+      covering.forEach(function (v) { if (v.color && colors.indexOf(v.color) < 0) colors.push(v.color); });
+      var style = colors.length ? 'box-shadow: inset 0 -4px 0 ' + colors[0] + ';' : '';
+      var title = colors.length > 1 ? ' title="nested groups"' : '';
+      html += '<span class="' + covering[0].cls + '" style="' + style + '"' + title + '>' + (chunk || '&#8203;') + '</span>';
+    }
+    if (zeroAt[text.length]) html += '<span class="mm-caret" title="empty match"></span>';
+    $('hl').innerHTML = html + '\n';
+  }
+
+  /* ---------- inspector ---------- */
+  function renderInspector(matches) {
+    var box = $('inspector');
+    var SHOW = 300;
+    var shown = matches.slice(0, SHOW);
+    $('matchCount').textContent = matches.length ? matches.length + ' match' + (matches.length === 1 ? '' : 'es') : '';
+    if (!matches.length) {
+      box.innerHTML = '<div class="rounded-lg border border-dashed border-[#1C2635] p-6 text-center text-sm text-slate-500">No matches yet.<br>Adjust the pattern or test string.</div>';
+      return;
+    }
+    var table = buildGroupTable(shown);
+    var html = table.map(function (row) {
+      var rows = row.rows.map(function (r) {
+        return groupRowHtml(r.label, r.color, r.text);
+      }).join('') + row.named.map(function (r) {
+        return groupRowHtml(r.label, r.color, r.text);
+      }).join('');
+      return '<div class="rounded-lg border border-[#1C2635] bg-[#0D1117] p-3">' +
+        '<div class="flex items-center justify-between text-xs">' +
+        '<span class="mono font-bold text-[#79C0FF]">Match ' + row.no + '</span>' +
+        '<span class="mono text-slate-500">@ ' + row.index + ' · len ' + row.full.length + '</span></div>' +
+        '<div class="mono mt-1.5 text-sm text-slate-100 break-all rounded bg-[#010409] border border-[#1C2635] px-2 py-1.5">' + (escHtml(row.full) || '<span class="text-slate-600">∅ empty match</span>') + '</div>' +
+        '<div class="mt-2 space-y-1">' + rows + '</div></div>';
+    }).join('');
+    if (matches.length > SHOW) html += '<p class="text-xs text-slate-500 text-center">…and ' + (matches.length - SHOW) + ' more (showing first ' + SHOW + ')</p>';
+    box.innerHTML = html;
+    box.querySelectorAll('[data-copy]').forEach(function (el) {
+      el.addEventListener('click', function () { copyText(el.getAttribute('data-copy'), 'Group text copied'); });
+    });
+  }
+  function groupRowHtml(label, color, text) {
+    var body = (text === null || text === undefined)
+      ? '<span class="text-slate-600 italic">did not participate</span>'
+      : '<span class="text-slate-200 break-all">' + escHtml(text) + '</span>';
+    return '<div data-copy="' + escHtml(text === null || text === undefined ? '' : text) + '" title="Click to copy" ' +
+      'class="flex items-start gap-2 rounded px-2 py-1 hover:bg-[#161E2A] cursor-pointer text-xs">' +
+      '<span class="mt-1 inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background:' + color + '"></span>' +
+      '<span class="mono text-slate-400 shrink-0 w-20">' + escHtml(label) + '</span>' + body + '</div>';
+  }
+
+  /* ---------- ReDoS badge ---------- */
+  function renderRedos(pattern) {
+    var box = $('redosBox');
+    var issues;
+    try { issues = redosScan(pattern); } catch (e) { issues = []; }
+    if (!issues.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    var worst = issues.some(function (x) { return x.severity === 'high'; }) ? 'high' : 'medium';
+    var cls = worst === 'high'
+      ? 'border-red-500/50 bg-red-500/10'
+      : 'border-amber-500/50 bg-amber-500/10';
+    var tcls = worst === 'high' ? 'text-red-300' : 'text-amber-300';
+    box.className = 'mx-4 mt-3 rounded-lg border px-3 py-2 text-sm ' + cls;
+    box.innerHTML = '<div class="' + tcls + ' font-semibold">⚠ ReDoS risk detected — ' + issues.length + ' issue' + (issues.length === 1 ? '' : 's') + '</div>' +
+      '<ul class="mt-1.5 space-y-1 text-slate-300 text-xs leading-relaxed">' +
+      issues.map(function (x) {
+        return '<li><span class="mono text-[#D2A8FF]">' + escHtml(x.snippet) + '</span> — ' + escHtml(x.message) + '</li>';
+      }).join('') + '</ul>';
+  }
+
+  /* ---------- replace ---------- */
+  function renderReplace() {
+    var c = compileRegex(state.pattern, state.flags);
+    var errBox = $('replaceError');
+    if (!c.ok) { errBox.classList.add('hidden'); return; }
+    var out;
+    try { out = state.text.replace(c.regex, state.replacement); }
+    catch (e) {
+      errBox.textContent = 'Replace failed: ' + String((e && e.message) || e);
+      errBox.classList.remove('hidden');
+      return;
+    }
+    errBox.classList.add('hidden');
+    $('replaceOut').textContent = out;
+    var d = diffRegions(state.text, out);
+    $('diffBefore').innerHTML = escHtml(d.pre) + '<span class="bg-red-500/30 rounded px-0.5">' + escHtml(d.beforeMid) + '</span>' + escHtml(d.post);
+    $('diffAfter').innerHTML = escHtml(d.pre) + '<span class="bg-emerald-500/30 rounded px-0.5">' + escHtml(d.afterMid) + '</span>' + escHtml(d.post);
+  }
+
+  /* ---------- snippets ---------- */
+  var SNIP = { js: snippetJS, python: snippetPython, php: snippetPHP, java: snippetJava };
+  function renderSnippet() {
+    try { $('codeOut').textContent = SNIP[state.lang](state.pattern, state.flags); }
+    catch (e) { $('codeOut').textContent = '// could not generate snippet'; }
+  }
+
+  /* ---------- library ---------- */
+  function renderLibrary(filter) {
+    var grid = $('libGrid');
+    var q = (filter || '').toLowerCase();
+    var list = PATTERN_LIBRARY.filter(function (p) {
+      return !q || p.name.toLowerCase().indexOf(q) >= 0 || p.desc.toLowerCase().indexOf(q) >= 0;
+    });
+    $('libCount').textContent = '(' + PATTERN_LIBRARY.length + ' patterns)';
+    grid.innerHTML = '';
+    list.forEach(function (p) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'libbtn text-left rounded-lg border border-[#1C2635] bg-[#0D1117] p-2.5 transition-all';
+      b.innerHTML = '<div class="text-xs font-semibold text-slate-200 truncate">' + escHtml(p.name) + '</div>' +
+        '<div class="mono text-[10px] text-[#79C0FF]/80 truncate mt-0.5">/' + escHtml(p.pattern.length > 34 ? p.pattern.slice(0, 34) + '…' : p.pattern) + '/' + escHtml(p.flags) + '</div>' +
+        '<div class="text-[10px] text-slate-500 truncate mt-0.5">' + escHtml(p.desc) + '</div>';
+      b.title = p.desc + '\n/' + p.pattern + '/' + p.flags;
+      b.addEventListener('click', function () {
+        state.pattern = p.pattern; state.flags = p.flags;
+        $('pattern').value = p.pattern;
+        renderFlags(); run();
+        toast('Loaded: ' + p.name);
+        document.getElementById('top').scrollIntoView({ behavior: 'smooth' });
+      });
+      grid.appendChild(b);
+    });
+    if (!list.length) grid.innerHTML = '<p class="col-span-full text-sm text-slate-500 text-center py-4">No patterns match your search.</p>';
+  }
+
+  /* ---------- share / hash ---------- */
+  var hashTimer = null;
+  function updateHash() {
+    clearTimeout(hashTimer);
+    hashTimer = setTimeout(function () {
+      try { history.replaceState(null, '', '#' + encodeState(state.pattern, state.flags, state.text, state.replacement)); }
+      catch (e) { /* ignore */ }
+    }, 700);
+  }
+  function persist() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ p: state.pattern, f: state.flags, t: state.text, r: state.replacement })); }
+    catch (e) { /* ignore */ }
+  }
+
+  /* ---------- main run ---------- */
+  var runTimer = null;
+  function scheduleRun() { clearTimeout(runTimer); runTimer = setTimeout(run, 120); }
+  function run() {
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    var res = extractMatches(state.pattern, state.flags, state.text);
+    var dt = ((window.performance && performance.now) ? performance.now() : Date.now()) - t0;
+    var errBox = $('regexError');
+    if (!res.ok) {
+      errBox.textContent = '⚠ Invalid regex — ' + res.error;
+      errBox.classList.remove('hidden');
+      $('redosBox').classList.add('hidden');
+      $('inspector').innerHTML = '<div class="rounded-lg border border-dashed border-[#1C2635] p-6 text-center text-sm text-slate-500">Fix the pattern to see matches.</div>';
+      $('matchCount').textContent = '';
+      $('stats').textContent = '';
+      $('hl').innerHTML = escHtml(state.text);
+      renderSnippet();
+      return;
+    }
+    errBox.classList.add('hidden');
+    var matches = res.matches;
+    renderUnderlay(state.text, matches.slice(0, 300));
+    renderInspector(matches);
+    var groups = 0;
+    matches.forEach(function (m) { groups += m.groups.length + m.named.length; });
+    $('stats').textContent = matches.length + ' match' + (matches.length === 1 ? '' : 'es') + ' · ' + groups + ' groups · ' + dt.toFixed(2) + ' ms' + (res.truncated ? ' · truncated' : '');
+    renderRedos(state.pattern);
+    if (state.mode === 'replace') renderReplace();
+    renderSnippet();
+    persist();
+    updateHash();
+  }
+
+  /* ---------- wire up ---------- */
+  function init() {
+    var fromHash = decodeState(location.hash || '');
+    var stored = null;
+    try { stored = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) { /* ignore */ }
+    var src = fromHash || stored;
+    if (src) {
+      state.pattern = src.p !== undefined ? src.p : src.pattern;
+      state.flags = sanitizeFlags(src.f !== undefined ? src.f : src.flags) || 'g';
+      state.text = src.t !== undefined ? src.t : src.text;
+      if (src.r !== undefined) state.replacement = src.r;
+      else if (src.replacement !== undefined) state.replacement = src.replacement;
+    }
+    $('pattern').value = state.pattern;
+    $('testText').value = state.text;
+    $('replacement').value = state.replacement;
+    renderFlags();
+    renderLibrary('');
+    $('pattern').addEventListener('input', function (e) { state.pattern = e.target.value; scheduleRun(); });
+    $('testText').addEventListener('input', function (e) { state.text = e.target.value; scheduleRun(); });
+    $('testText').addEventListener('scroll', function (e) {
+      $('hl').scrollTop = e.target.scrollTop; $('hl').scrollLeft = e.target.scrollLeft;
+    });
+    $('replacement').addEventListener('input', function (e) { state.replacement = e.target.value; scheduleRun(); });
+    $('tabTest').addEventListener('click', function () { setMode('test'); });
+    $('tabReplace').addEventListener('click', function () { setMode('replace'); });
+    document.querySelectorAll('.langbtn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.lang = b.getAttribute('data-lang');
+        document.querySelectorAll('.langbtn').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        renderSnippet();
+      });
+    });
+    $('copyCodeBtn').addEventListener('click', function () { copyText($('codeOut').textContent, 'Code snippet copied'); });
+    $('copyResultBtn').addEventListener('click', function () { copyText($('replaceOut').textContent, 'Result copied'); });
+    $('copyPatternBtn').addEventListener('click', function () { copyText(state.pattern, 'Pattern copied'); });
+    $('clearBtn').addEventListener('click', function () {
+      state.pattern = ''; state.flags = 'g'; state.text = ''; state.replacement = '';
+      $('pattern').value = ''; $('testText').value = ''; $('replacement').value = '';
+      renderFlags(); run();
+    });
+    $('shareBtn').addEventListener('click', function () {
+      var url = location.origin + location.pathname + '#' + encodeState(state.pattern, state.flags, state.text, state.replacement);
+      copyText(url, 'Shareable link copied');
+    });
+    $('libSearch').addEventListener('input', function (e) { renderLibrary(e.target.value); });
+    run();
+  }
+  function setMode(mode) {
+    state.mode = mode;
+    $('paneTest').classList.toggle('hidden', mode !== 'test');
+    $('paneReplace').classList.toggle('hidden', mode !== 'replace');
+    $('tabTest').classList.toggle('on', mode === 'test');
+    $('tabReplace').classList.toggle('on', mode === 'replace');
+    if (mode === 'replace') renderReplace();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
